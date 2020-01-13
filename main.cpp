@@ -115,6 +115,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	// Game hasn't started yet if TimeBase is still updating
 	if (Input->TimeBase != OldTimeBase)
 	{
+		OutputDebugStringA("Test debug 1");
 		LastPingFrames = 0;
 		return;
 	}
@@ -125,6 +126,8 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 		LastPingFrames = 0;
 		return;
 	}
+	
+	OutputDebugStringA("Test debug 2");
 
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
 
