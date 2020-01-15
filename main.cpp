@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <Psapi.h>
+#include <stdio.h>
+#include <fstream>
 
 namespace Proud
 {
@@ -110,12 +112,14 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	const auto OldTimeBase = Input->TimeBase;
 	UpdateTimestampsOrigWrapper(Input);
 
+	static std::ofstream DBGFile("c:\\dump\\dbglog.txt");
+
 	static unsigned int LastPingFrames = 0;
 
 	// Game hasn't started yet if TimeBase is still updating
 	if (Input->TimeBase != OldTimeBase)
 	{
-		OutputDebugStringA("Test debug 1");
+		DBGFile << "Waiting for TimeBase\n";
 		LastPingFrames = 0;
 		return;
 	}
@@ -123,13 +127,18 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	unsigned int Ping;
 	if (!GetPing(&Ping))
 	{
+		DBGFile << "Failed to get ping\n";
 		LastPingFrames = 0;
 		return;
 	}
 	
-	OutputDebugStringA("Test debug 2");
+	static char DBGStr[1024];
 
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
+
+	snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
+		Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
+	DBGFile << DBGStr;
 
 	// Don't hitch from small ping fluctuations
 	if (PingFrames == LastPingFrames - 1)
@@ -143,6 +152,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	if (Input->CurrentTimestamp >= Input->OpponentTimestamp + Input->MaxFramesAhead)
 	{
 		// Don't speed up after waiting for the opponent if ping increases
+		DBGFile << "Reducing TimeBase\n";
 		Input->TimeBase--;
 	}
 
@@ -152,7 +162,11 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	{
 		// Speed up to correct for hitch
 		Input->FramesToSimulate = TargetTimestamp - Input->CurrentTimestamp;
+		snprintf(DBGStr, 1024, "Updating FramesToSimulate: %d\n", Input->FramesToSimulate);
+		DBGFile << DBGStr;
 	}
+
+	DBGFile.flush();
 }
 
 bool GetModuleBounds(const char *Name, uintptr_t *Start, uintptr_t *End)
