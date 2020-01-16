@@ -2,6 +2,8 @@
 #include <Psapi.h>
 #include <stdio.h>
 #include <fstream>
+#include <time.h>
+#include <direct.h>
 
 namespace Proud
 {
@@ -25,7 +27,7 @@ namespace Proud
 		struct
 		{
 			int Id;
-			CHostBase *Pointer;
+			CHostBase* Pointer;
 		} *Host;
 	private:
 		char pad540[0x540 - 0x2B8 - 8];
@@ -65,7 +67,7 @@ class UnknownNetBullshit
 private:
 	char pad010[0x10];
 public:
-	Proud::CNetClient *Client;
+	Proud::CNetClient* Client;
 };
 
 class UnknownNetList
@@ -73,17 +75,17 @@ class UnknownNetList
 private:
 	char pad070[0x70];
 public:
-	UnknownNetBullshit **List;
-	UnknownNetBullshit **ListEnd;
+	UnknownNetBullshit** List;
+	UnknownNetBullshit** ListEnd;
 };
 
-UnknownNetList *NetList;
+UnknownNetList* NetList;
 
 extern "C" uintptr_t UpdateTimestampsOrig;
 uintptr_t UpdateTimestampsOrig;
 extern "C" void UpdateTimestampsOrigWrapper(UInputUnit*);
 
-bool GetPing(unsigned int *Ping)
+bool GetPing(unsigned int* Ping)
 {
 	// Index 1 is opponent
 	if (NetList->List == nullptr ||
@@ -95,31 +97,49 @@ bool GetPing(unsigned int *Ping)
 	}
 
 	// dynamic_cast to CNetClientImpl
-	const auto *Client = NetList->List[1]->Client;
-	const auto *ClientImpl = (Proud::CNetClientImpl*)((char*)Client - offsetof(Proud::CNetClientImpl, Base));
+	const auto* Client = NetList->List[1]->Client;
+	const auto* ClientImpl = (Proud::CNetClientImpl*)((char*)Client - offsetof(Proud::CNetClientImpl, Base));
 
 	if (ClientImpl->Host == nullptr || ClientImpl->Host->Pointer == nullptr)
 		return false;
 
-	const auto *Peer = (Proud::CRemotePeer*)ClientImpl->Host->Pointer;
+	const auto* Peer = (Proud::CRemotePeer*)ClientImpl->Host->Pointer;
 	*Ping = Peer->Ping;
 	return true;
 }
 
+void filename(char* str, int len)
+{
+	time_t now;
+	tm FmtNow;
+
+	_mkdir("C:\\sfv-logs");
+	_mkdir("C:\\sfv-bins");
+	time(&now);
+	localtime_s(&FmtNow, &now);
+	strftime(str, len, "c:\\sfv-logs\\log-%F-%H%M%S.txt", &FmtNow);
+}
+
 // Called after UInputUnit::UpdateTimestamps
-extern "C" void UpdateTimestampsHook(UInputUnit *Input)
+extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 {
 	const auto OldTimeBase = Input->TimeBase;
 	UpdateTimestampsOrigWrapper(Input);
 
-	static std::ofstream DBGFile("c:\\dump\\dbglog.txt");
+	static char DBGStr[1024];
+	static std::ofstream DBGFile, BINFile;
 
 	static unsigned int LastPingFrames = 0;
 
 	// Game hasn't started yet if TimeBase is still updating
 	if (Input->TimeBase != OldTimeBase)
 	{
-		DBGFile << "Waiting for TimeBase\n";
+		if (DBGFile.is_open())
+		{
+			DBGFile << "Waiting for TimeBase\n";
+			DBGFile.close();
+			BINFile.close();
+		}
 		LastPingFrames = 0;
 		return;
 	}
@@ -127,18 +147,33 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	unsigned int Ping;
 	if (!GetPing(&Ping))
 	{
-		DBGFile << "Failed to get ping\n";
 		LastPingFrames = 0;
+		if (DBGFile.is_open())
+		{
+			DBGFile << "Failed to get ping\n";
+			DBGFile.close();
+			BINFile.close();
+		}
 		return;
 	}
-	
-	static char DBGStr[1024];
 
+	if (!DBGFile.is_open() && (Input->TimeBase > 150) && (Input->TimeBase < 500))
+	{
+		filename(DBGStr, 1024);
+		DBGFile.open(DBGStr, std::ofstream::out | std::ofstream::app);
+		char* loc = strstr(DBGStr, "log-");
+		memcpy_s(loc, 64, "bin", 3);
+		BINFile.open(DBGStr, std::ofstream::out | std::ofstream::app | std::ofstream::binary);
+	}
+
+	int len = sizeof(*Input);
+	BINFile.write((char *)Input, len);
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
 
 	snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
 		Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
-	DBGFile << DBGStr;
+	if (DBGFile.is_open())
+		DBGFile << DBGStr;
 
 	// Don't hitch from small ping fluctuations
 	if (PingFrames == LastPingFrames - 1)
@@ -147,12 +182,13 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 		LastPingFrames = PingFrames;
 
 	// Don't get farther ahead than normal for compatibility, even with high ping
-	Input->MaxFramesAhead = min(PingFrames + 1, 15);
+//	Input->MaxFramesAhead = min(PingFrames + 1, 15);
 
 	if (Input->CurrentTimestamp >= Input->OpponentTimestamp + Input->MaxFramesAhead)
 	{
 		// Don't speed up after waiting for the opponent if ping increases
-		DBGFile << "Reducing TimeBase\n";
+		if (DBGFile.is_open())
+			DBGFile << "Reducing TimeBase\n";
 		Input->TimeBase--;
 	}
 
@@ -161,18 +197,20 @@ extern "C" void UpdateTimestampsHook(UInputUnit *Input)
 	if (Input->CurrentTimestamp < TargetTimestamp)
 	{
 		// Speed up to correct for hitch
-		Input->FramesToSimulate = TargetTimestamp - Input->CurrentTimestamp;
+//		Input->FramesToSimulate = TargetTimestamp - Input->CurrentTimestamp;
 		snprintf(DBGStr, 1024, "Updating FramesToSimulate: %d\n", Input->FramesToSimulate);
-		DBGFile << DBGStr;
+		if (DBGFile.is_open())
+			DBGFile << DBGStr;
 	}
 
-	DBGFile.flush();
+	if (DBGFile.is_open())
+		DBGFile.flush();
 }
 
-bool GetModuleBounds(const char *Name, uintptr_t *Start, uintptr_t *End)
+bool GetModuleBounds(const char* Name, uintptr_t* Start, uintptr_t* End)
 {
 	const auto Module = GetModuleHandle(Name);
-	if(Module == nullptr)
+	if (Module == nullptr)
 		return false;
 
 	MODULEINFO Info;
@@ -182,7 +220,7 @@ bool GetModuleBounds(const char *Name, uintptr_t *Start, uintptr_t *End)
 	return true;
 }
 
-uintptr_t Sigscan(const uintptr_t Start, const uintptr_t End, const char *Sig, const char *Mask)
+uintptr_t Sigscan(const uintptr_t Start, const uintptr_t End, const char* Sig, const char* Mask)
 {
 	const auto ScanEnd = End - strlen(Mask) + 1;
 	for (auto Address = Start; Address < ScanEnd; Address++) {
@@ -199,10 +237,10 @@ uintptr_t Sigscan(const uintptr_t Start, const uintptr_t End, const char *Sig, c
 
 uintptr_t GetRel32(const uintptr_t Address)
 {
-	return Address + *(int*)(Address) + 4;
+	return Address + *(int*)(Address)+4;
 }
 
-void JmpHook(const uintptr_t Address, void *Target)
+void JmpHook(const uintptr_t Address, void* Target)
 {
 	constexpr auto PatchSize = 12;
 
