@@ -114,7 +114,6 @@ void filename(char* str, int len)
 	tm FmtNow;
 
 	_mkdir("C:\\sfv-logs");
-	_mkdir("C:\\sfv-bins");
 	time(&now);
 	localtime_s(&FmtNow, &now);
 	strftime(str, len, "c:\\sfv-logs\\log-%F-%H%M%S.txt", &FmtNow);
