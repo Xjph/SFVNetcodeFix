@@ -112,11 +112,15 @@ void filename(char* str, int len)
 {
 	time_t now;
 	tm FmtNow;
+	char dir[256];
 
-	_mkdir("C:\\sfv-logs");
 	time(&now);
 	localtime_s(&FmtNow, &now);
-	strftime(str, len, "c:\\sfv-logs\\log-%F-%H%M%S.txt", &FmtNow);
+	//	snprintf(dir, 256, "C:\\sfv-logs-%d", (int)now);
+	_mkdir("C:\\sfv-logs");
+	snprintf(dir, 256, "C:\\sfv-logs\\current");
+	_mkdir(dir);
+	strftime(str, len, "c:\\sfv-logs\\current\\log-%F-%H%M%S.txt", &FmtNow);
 }
 
 // Called after UInputUnit::UpdateTimestamps
@@ -162,15 +166,32 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		DBGFile.open(DBGStr, std::ofstream::out | std::ofstream::app);
 		char* loc = strstr(DBGStr, "log-");
 		memcpy_s(loc, 64, "bin", 3);
+		loc = strstr(DBGStr, ".txt");
+		memcpy_s(loc, 64, ".bin", 4);
 		BINFile.open(DBGStr, std::ofstream::out | std::ofstream::app | std::ofstream::binary);
 	}
 
 	int len = sizeof(*Input);
-	BINFile.write((char *)Input, len);
+	BINFile.write((char*)Input, len);
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
+	static int OldRealtimeStamp = 0;
 
-	snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
-		Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
+	auto ct = Input->CurrentTimestamp % 60;
+	if (ct == 0)
+	{
+		int ts = GetTickCount();
+		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, TimeDiff %d\n",
+			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate, ts-OldRealtimeStamp);
+		OldRealtimeStamp = ts;
+	}
+	else if (ct == 1)
+	{
+		int ts = GetTickCount();
+		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, RealTime %d\n",
+			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate, ts);
+	} else
+		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
+			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
 	if (DBGFile.is_open())
 		DBGFile << DBGStr;
 
@@ -197,7 +218,8 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	{
 		// Speed up to correct for hitch
 //		Input->FramesToSimulate = TargetTimestamp - Input->CurrentTimestamp;
-		snprintf(DBGStr, 1024, "Updating FramesToSimulate: %d\n", Input->FramesToSimulate);
+		snprintf(DBGStr, 1024, "Updating FramesToSimulate: %d, would be %d\n", Input->FramesToSimulate,
+			(Input->OpponentTimestamp + Input->MaxFramesAhead - Input->CurrentTimestamp));
 		if (DBGFile.is_open())
 			DBGFile << DBGStr;
 	}
