@@ -137,6 +137,10 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	// but converges it to CurrentTimestamp + 1.
 	// Once converged, hold it there during brief mash lag.
 	static bool TimestampAdjustAllowed = false;
+	static int CumulativeLag, CumulativePings;
+	static int LagRecord[32], PingRecord[32]; // auto initialized to all zeroes
+	static int ArrayPosition;
+	static int ResyncTimer, ResyncLevel;
 
 	// Game hasn't started yet if TimeBase is still updating
 	if (Input->TimeBase != OldTimeBase)
@@ -146,6 +150,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			DBGFile << "Waiting for TimeBase\n";
 			DBGFile.close();
 			TimestampAdjustAllowed = false;
+			ResyncTimer = 0;
 			//BINFile.close();
 		}
 		LastPingFrames = 0;
@@ -161,6 +166,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			DBGFile << "Failed to get ping\n";
 			DBGFile.close();
 			TimestampAdjustAllowed = false;
+			ResyncTimer = 0;
 			//BINFile.close();
 		}
 		return;
@@ -180,11 +186,17 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	int len = sizeof(*Input);
 	//BINFile.write((char*)Input, len);
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
+	if (PingFrames > 16)
+	{
+		snprintf(DBGStr, 1024, "Horked up a giant ping of %d\n", PingFrames);
+		DBGFile << DBGStr;
+		return;
+	}
 	static int OldRealtimeStamp = 0;
 	static int DesiredTimestampCounter = 0;
 	static int LastOpponentTimestamp = 0;
 
-	if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < 4))
+		if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < 4))
 	{
 		DesiredTimestampCounter++;
 		if (DBGFile.is_open())
@@ -241,15 +253,88 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		snprintf(DBGStr, 1024, "Setting lag time %d\n", LagTime);
 		DBGFile << DBGStr;
 	}
-	
+
 	if (Input->CurrentTimestamp < LagTime + 4)
 		Input->MaxFramesAhead = 15;
 		else
 					Input->MaxFramesAhead = PingFrames + 1;
 					*/
 
-	static int ResyncTimer = 0;
 
+	if (ResyncTimer > 0)
+	{
+		ResyncTimer--;
+		Input->MaxFramesAhead = ResyncLevel;
+	}
+	else if (Input->CurrentTimestamp == 210)
+	{
+		memset(LagRecord, 0, 32 * sizeof(int));
+		memset(PingRecord, 0, 32 * sizeof(int));
+	}
+	else if (Input->CurrentTimestamp > 210)
+	{
+		int LagNow = Input->CurrentTimestamp - Input->OpponentTimestamp;
+		CumulativeLag += LagNow;
+		CumulativeLag -= LagRecord[ArrayPosition];
+		LagRecord[ArrayPosition] = LagNow;
+		PingRecord[ArrayPosition] = PingFrames;
+		if (ArrayPosition == 31)
+			ArrayPosition = 0;
+		else
+			ArrayPosition++;
+
+		if (Input->CurrentTimestamp > 242)
+		{
+			if (LagNow > (int)PingFrames + 1) // Buffers full and lag is ominous
+			{
+				DBGFile << "Performing detailed lagalysis... ";
+				int PingHistogram[16];
+				memset(PingHistogram, 0, 16 * sizeof(int));
+				for (int i = 0; i < 32; i++)
+				{
+					int ClampedPing = PingRecord[i];
+					if (ClampedPing < 15)
+						PingHistogram[PingRecord[i]]++;
+					else
+						PingHistogram[15]++;
+				}
+
+				// Find the mode of the ping, rather than the average or recent
+				int MostCommonPing = 0, HighPingCount = 0;
+				for (int i = 0; i < 16; i++)
+					if (PingHistogram[i] > HighPingCount)
+					{
+						HighPingCount = PingHistogram[i];
+						MostCommonPing = i;
+					}
+				snprintf(DBGStr, 1024, "Ping mode is %d\n", MostCommonPing);
+				DBGFile << DBGStr;
+
+				// Finally determine if there have been enough laggy frames recently to activate the lag compensation
+				int LaggyFrames = 0;
+				for (int i = 0; i < 32; i++)
+					if (LagRecord[i] > PingRecord[i] + 1)
+						LaggyFrames++;
+				if (LaggyFrames > 16)
+				{
+					snprintf(DBGStr, 1024, "Activating anti-lag, %d laggy frames detected\n", LaggyFrames);
+					DBGFile << DBGStr;
+					ResyncLevel = MostCommonPing;
+					Input->MaxFramesAhead = ResyncLevel;
+					ResyncTimer = 10;
+				}
+			}
+			else
+				Input->MaxFramesAhead = 15;
+		}
+		else // Start of round behavior
+		{
+			Input->MaxFramesAhead = PingFrames + 1;
+		}
+	}
+
+
+	/* Version H
 	if (Input->CurrentTimestamp > 210)
 	{
 		if (ResyncTimer > 0)
@@ -268,7 +353,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		}
 		else
 			Input->MaxFramesAhead = 15;
-	}
+	} */
 
 	/* Version F
 	if ((Input->CurrentTimestamp & 0x7f) < 16)
