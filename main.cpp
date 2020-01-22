@@ -221,10 +221,12 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		DBGFile << DBGStr;
 
 	// Don't hitch from small ping fluctuations
+	/*
 	if (PingFrames == LastPingFrames - 1)
 		PingFrames = LastPingFrames;
 	else
 		LastPingFrames = PingFrames;
+		*/
 
 	static int LagTime = 0;
 
@@ -246,10 +248,34 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 					Input->MaxFramesAhead = PingFrames + 1;
 					*/
 
+	static int ResyncTimer = 0;
+
+	if (Input->CurrentTimestamp > 210)
+	{
+		if (ResyncTimer > 0)
+		{
+			snprintf(DBGStr, 1024, "Setting MaxFrames by ResyncTimer %d\n", ResyncTimer);
+			DBGFile << DBGStr;
+			Input->MaxFramesAhead = PingFrames + 1;
+			ResyncTimer--;
+		}
+		else if ((Input->CurrentTimestamp > Input->OpponentTimestamp + PingFrames + 1) || (Input->CurrentTimestamp < 250))
+		{
+			snprintf(DBGStr, 1024, "Setting resync from detected lag or round start\n");
+			DBGFile << DBGStr;
+			Input->MaxFramesAhead = PingFrames + 1;
+			ResyncTimer = 10;
+		}
+		else
+			Input->MaxFramesAhead = 15;
+	}
+
+	/* Version F
 	if ((Input->CurrentTimestamp & 0x7f) < 16)
 		Input->MaxFramesAhead = PingFrames + 1;
 	else
 		Input->MaxFramesAhead = 15;
+		*/
 
 	LastOpponentTimestamp = Input->OpponentTimestamp;
 
