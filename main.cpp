@@ -5,6 +5,14 @@
 #include <time.h>
 #include <direct.h>
 
+constexpr int LAG_THRESHOLD = 16;
+constexpr int MAX_PING = 16;
+constexpr int GAME_START_FRAME = 210;
+constexpr int PACKET_HISTORY_SIZE = 32;
+constexpr int TS_HOLD_TIME = 4;
+constexpr int RESYNC_WINDOW = 10;
+constexpr int DBGLEN = 1024;
+
 namespace Proud
 {
 	class CHostBase {};
@@ -116,7 +124,6 @@ void filename(char* str, int len)
 
 	time(&now);
 	localtime_s(&FmtNow, &now);
-	//	snprintf(dir, 256, "C:\\sfv-logs-%d", (int)now);
 	_mkdir("C:\\sfv-logs");
 	snprintf(dir, 256, "C:\\sfv-logs\\current");
 	_mkdir(dir);
@@ -129,15 +136,14 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	const auto OldTimeBase = Input->TimeBase;
 	UpdateTimestampsOrigWrapper(Input);
 
-	static char DBGStr[1024];
+	static char DBGStr[DBGLEN];
 	static std::ofstream DBGFile;
 
-	static unsigned int LastPingFrames = 0;
 	// Game sets DesiredTimestamp to be less than CurrentTimestamp at round start,
 	// but converges it to CurrentTimestamp + 1.
 	// Once converged, hold it there during brief mash lag.
 	static bool TimestampAdjustAllowed = false;
-	static int LagRecord[32], PingRecord[32]; // auto initialized to all zeroes
+	static int LagRecord[PACKET_HISTORY_SIZE], PingRecord[PACKET_HISTORY_SIZE]; // auto initialized to all zeroes
 	static int ArrayPosition;
 	static int ResyncTimer, ResyncLevel;
 
@@ -151,14 +157,12 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			TimestampAdjustAllowed = false;
 			ResyncTimer = 0;
 		}
-		LastPingFrames = 0;
 		return;
 	}
 
 	unsigned int Ping;
 	if (!GetPing(&Ping))
 	{
-		LastPingFrames = 0;
 		if (DBGFile.is_open())
 		{
 			DBGFile << "Failed to get ping\n";
@@ -171,7 +175,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 
 	if (!DBGFile.is_open() && (Input->TimeBase > 150) && (Input->TimeBase < 500))
 	{
-		filename(DBGStr, 1024);
+		filename(DBGStr, DBGLEN);
 		DBGFile.open(DBGStr, std::ofstream::out | std::ofstream::app);
 		char* loc = strstr(DBGStr, "log-");
 		memcpy_s(loc, 64, "bin", 3);
@@ -179,23 +183,21 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		memcpy_s(loc, 64, ".bin", 4);
 	}
 
-	int len = sizeof(*Input);
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
-	if (PingFrames > 16)
+	if (PingFrames > MAX_PING) // From time to time, the GetPing function returns nonsense - I have no idea why.  Nothing can be done in this case
 	{
-		snprintf(DBGStr, 1024, "Horked up a giant ping of %d\n", PingFrames);
+		snprintf(DBGStr, DBGLEN, "Horked up a giant ping of %d\n", PingFrames);
 		DBGFile << DBGStr;
 		return;
 	}
-	static int OldRealtimeStamp = 0;
-	static int DesiredTimestampCounter = 0;
 
-		if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < 4))
+	static int DesiredTimestampCounter = 0;
+	if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < TS_HOLD_TIME))
 	{
 		DesiredTimestampCounter++;
 		if (DBGFile.is_open())
 		{
-			snprintf(DBGStr, 1024, "Adjusting desired timestamp from %d to %d\n", Input->DesiredTimestamp, Input->CurrentTimestamp - 1);
+			snprintf(DBGStr, DBGLEN, "Adjusting desired timestamp from %d to %d\n", Input->DesiredTimestamp, Input->CurrentTimestamp - 1);
 			DBGFile << DBGStr;
 		}
 		Input->DesiredTimestamp = Input->CurrentTimestamp - 1;
@@ -206,96 +208,98 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		TimestampAdjustAllowed = TimestampAdjustAllowed | (Input->DesiredTimestamp > Input->CurrentTimestamp);
 	}
 
+	static int OldRealtimeStamp = 0;
 	auto ct = Input->CurrentTimestamp % 60;
 	if (ct == 0)
 	{
 		int ts = GetTickCount();
-		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, TimeDiff %d\n",
+		snprintf(DBGStr, DBGLEN, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, TimeDiff %d\n",
 			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate, ts - OldRealtimeStamp);
 		OldRealtimeStamp = ts;
 	}
 	else if (ct == 1)
 	{
 		int ts = GetTickCount();
-		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, RealTime %d\n",
+		snprintf(DBGStr, DBGLEN, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d, RealTime %d\n",
 			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate, ts);
 	}
 	else
-		snprintf(DBGStr, 1024, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
+		snprintf(DBGStr, DBGLEN, "UpdateTimestamps: Ping %d, PingFrames %d, TimeBase %d, CurrentTimestamp %d, OpponentTimestamp %d, DesiredTimestamp %d, MaxFramesAhead %d, FramesToSimulate %d\n",
 			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
 	if (DBGFile.is_open())
 		DBGFile << DBGStr;
 
-	if (ResyncTimer > 0)
+	if (ResyncTimer > 0) // Resync ordered by previous lag detection
 	{
 		ResyncTimer--;
 		Input->MaxFramesAhead = ResyncLevel;
 	}
-	else if (Input->CurrentTimestamp == 210)
+	else if (Input->CurrentTimestamp == GAME_START_FRAME) // On first monitored frame, initialize the buffers
 	{
-		memset(LagRecord, 0, 32 * sizeof(int));
-		memset(PingRecord, 0, 32 * sizeof(int));
+		memset(LagRecord, 0, PACKET_HISTORY_SIZE * sizeof(int));
+		memset(PingRecord, 0, PACKET_HISTORY_SIZE * sizeof(int));
 	}
-	else if (Input->CurrentTimestamp > 210)
+	else if (Input->CurrentTimestamp > GAME_START_FRAME) // Normal monitored frames - record lag stats, then check for lag in effect
 	{
 		int LagNow = Input->CurrentTimestamp - Input->OpponentTimestamp;
 		LagRecord[ArrayPosition] = LagNow;
 		PingRecord[ArrayPosition] = PingFrames;
-		if (ArrayPosition == 31)
+		if (ArrayPosition == PACKET_HISTORY_SIZE - 1)
 			ArrayPosition = 0;
 		else
 			ArrayPosition++;
 
-		if (Input->CurrentTimestamp > 242)
+		if (Input->CurrentTimestamp > GAME_START_FRAME + PACKET_HISTORY_SIZE)
 		{
 			if (LagNow > (int)PingFrames + 1) // Buffers full and lag is ominous
 			{
 				DBGFile << "Performing detailed lagalysis... ";
-				int PingHistogram[16];
-				memset(PingHistogram, 0, 16 * sizeof(int));
-				for (int i = 0; i < 32; i++)
+				int PingHistogram[MAX_PING]; // Frequency of half-ping times with which packets are received
+				memset(PingHistogram, 0, MAX_PING * sizeof(int));
+				for (int i = 0; i < PACKET_HISTORY_SIZE; i++)
 				{
 					int ClampedPing = PingRecord[i];
-					if (ClampedPing < 15)
+					if (ClampedPing < MAX_PING - 1)
 						PingHistogram[PingRecord[i]]++;
 					else
-						PingHistogram[15]++;
+						PingHistogram[MAX_PING - 1]++;
 				}
 
 				// Find the mode of the ping, rather than the average or recent
 				int MostCommonPing = 0, HighPingCount = 0;
-				for (int i = 0; i < 16; i++)
+				for (int i = 0; i < MAX_PING; i++)
 					if (PingHistogram[i] > HighPingCount)
 					{
 						HighPingCount = PingHistogram[i];
 						MostCommonPing = i;
 					}
-				snprintf(DBGStr, 1024, "Ping mode is %d\n", MostCommonPing);
+				snprintf(DBGStr, DBGLEN, "Ping mode is %d\n", MostCommonPing);
 				DBGFile << DBGStr;
 
 				// Finally determine if there have been enough laggy frames recently to activate the lag compensation
 				int LaggyFrames = 0;
-				for (int i = 0; i < 32; i++)
+				for (int i = 0; i < PACKET_HISTORY_SIZE; i++)
 					if (LagRecord[i] > PingRecord[i] + 1)
 						LaggyFrames++;
-				if (LaggyFrames > 16)
+				if (LaggyFrames > LAG_THRESHOLD)
 				{
-					snprintf(DBGStr, 1024, "Activating anti-lag, %d laggy frames detected\n", LaggyFrames);
+					snprintf(DBGStr, DBGLEN, "Activating anti-lag, %d laggy frames detected\n", LaggyFrames);
 					DBGFile << DBGStr;
 					ResyncLevel = MostCommonPing;
 					Input->MaxFramesAhead = ResyncLevel;
-					ResyncTimer = 10;
+					ResyncTimer = RESYNC_WINDOW;
+					memset(LagRecord, 0, PACKET_HISTORY_SIZE * sizeof(int)); // Old lag record might cause false positive after resync complete
 				}
 			}
 			else
-				Input->MaxFramesAhead = 15;
+				Input->MaxFramesAhead = 15; // Magic number 15 is used by vanilla, works in lag-free case
 		}
 		else // Start of round behavior
 		{
 			Input->MaxFramesAhead = PingFrames + 1;
 		}
 	}
-	}
+}
 
 bool GetModuleBounds(const char* Name, uintptr_t* Start, uintptr_t* End)
 {
