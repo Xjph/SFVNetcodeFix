@@ -130,14 +130,13 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	UpdateTimestampsOrigWrapper(Input);
 
 	static char DBGStr[1024];
-	static std::ofstream DBGFile; // , BINFile;
+	static std::ofstream DBGFile;
 
 	static unsigned int LastPingFrames = 0;
 	// Game sets DesiredTimestamp to be less than CurrentTimestamp at round start,
 	// but converges it to CurrentTimestamp + 1.
 	// Once converged, hold it there during brief mash lag.
 	static bool TimestampAdjustAllowed = false;
-	static int CumulativeLag, CumulativePings;
 	static int LagRecord[32], PingRecord[32]; // auto initialized to all zeroes
 	static int ArrayPosition;
 	static int ResyncTimer, ResyncLevel;
@@ -151,7 +150,6 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			DBGFile.close();
 			TimestampAdjustAllowed = false;
 			ResyncTimer = 0;
-			//BINFile.close();
 		}
 		LastPingFrames = 0;
 		return;
@@ -167,7 +165,6 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			DBGFile.close();
 			TimestampAdjustAllowed = false;
 			ResyncTimer = 0;
-			//BINFile.close();
 		}
 		return;
 	}
@@ -180,11 +177,9 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		memcpy_s(loc, 64, "bin", 3);
 		loc = strstr(DBGStr, ".txt");
 		memcpy_s(loc, 64, ".bin", 4);
-		//BINFile.open(DBGStr, std::ofstream::out | std::ofstream::app | std::ofstream::binary);
 	}
 
 	int len = sizeof(*Input);
-	//BINFile.write((char*)Input, len);
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
 	if (PingFrames > 16)
 	{
@@ -194,7 +189,6 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	}
 	static int OldRealtimeStamp = 0;
 	static int DesiredTimestampCounter = 0;
-	static int LastOpponentTimestamp = 0;
 
 		if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < 4))
 	{
@@ -232,35 +226,6 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	if (DBGFile.is_open())
 		DBGFile << DBGStr;
 
-	// Don't hitch from small ping fluctuations
-	/*
-	if (PingFrames == LastPingFrames - 1)
-		PingFrames = LastPingFrames;
-	else
-		LastPingFrames = PingFrames;
-		*/
-
-	static int LagTime = 0;
-
-	// Don't get farther ahead than normal for compatibility, even with high ping
-//	Input->MaxFramesAhead = min(PingFrames + 1, 15);
-	/*
-	if (Input->CurrentTimestamp < 280)
-		LagTime = 0;
-	else if (Input->OpponentTimestamp == LastOpponentTimestamp) // Packet loss, opponent lag, or whatever
-	{
-		LagTime = Input->CurrentTimestamp;
-		snprintf(DBGStr, 1024, "Setting lag time %d\n", LagTime);
-		DBGFile << DBGStr;
-	}
-
-	if (Input->CurrentTimestamp < LagTime + 4)
-		Input->MaxFramesAhead = 15;
-		else
-					Input->MaxFramesAhead = PingFrames + 1;
-					*/
-
-
 	if (ResyncTimer > 0)
 	{
 		ResyncTimer--;
@@ -274,8 +239,6 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	else if (Input->CurrentTimestamp > 210)
 	{
 		int LagNow = Input->CurrentTimestamp - Input->OpponentTimestamp;
-		CumulativeLag += LagNow;
-		CumulativeLag -= LagRecord[ArrayPosition];
 		LagRecord[ArrayPosition] = LagNow;
 		PingRecord[ArrayPosition] = PingFrames;
 		if (ArrayPosition == 31)
@@ -332,62 +295,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			Input->MaxFramesAhead = PingFrames + 1;
 		}
 	}
-
-
-	/* Version H
-	if (Input->CurrentTimestamp > 210)
-	{
-		if (ResyncTimer > 0)
-		{
-			snprintf(DBGStr, 1024, "Setting MaxFrames by ResyncTimer %d\n", ResyncTimer);
-			DBGFile << DBGStr;
-			Input->MaxFramesAhead = PingFrames + 1;
-			ResyncTimer--;
-		}
-		else if ((Input->CurrentTimestamp > Input->OpponentTimestamp + PingFrames + 1) || (Input->CurrentTimestamp < 250))
-		{
-			snprintf(DBGStr, 1024, "Setting resync from detected lag or round start\n");
-			DBGFile << DBGStr;
-			Input->MaxFramesAhead = PingFrames + 1;
-			ResyncTimer = 10;
-		}
-		else
-			Input->MaxFramesAhead = 15;
-	} */
-
-	/* Version F
-	if ((Input->CurrentTimestamp & 0x7f) < 16)
-		Input->MaxFramesAhead = PingFrames + 1;
-	else
-		Input->MaxFramesAhead = 15;
-		*/
-
-	LastOpponentTimestamp = Input->OpponentTimestamp;
-
-	if (false && (Input->CurrentTimestamp >= Input->OpponentTimestamp + Input->MaxFramesAhead))
-	{
-		// Don't speed up after waiting for the opponent if ping increases
-		if (DBGFile.is_open())
-			DBGFile << "Reducing TimeBase\n";
-		Input->TimeBase--;
 	}
-
-	// Never get ahead of where we should be based on real time
-	const auto TargetTimestamp = min(Input->DesiredTimestamp, Input->OpponentTimestamp + Input->MaxFramesAhead);
-	if (false && (Input->CurrentTimestamp < TargetTimestamp))
-	{
-		// Speed up to correct for hitch
-//		Input->FramesToSimulate = TargetTimestamp - Input->CurrentTimestamp;
-		snprintf(DBGStr, 1024, "Updating FramesToSimulate: %d, would be %d\n", Input->FramesToSimulate,
-			(Input->OpponentTimestamp + Input->MaxFramesAhead - Input->CurrentTimestamp));
-		if (DBGFile.is_open())
-			DBGFile << DBGStr;
-	}
-
-	//Input->FramesToSimulate = max(PingFrames - 1, 1);
-	//if (DBGFile.is_open())
-		//DBGFile.flush();
-}
 
 bool GetModuleBounds(const char* Name, uintptr_t* Start, uintptr_t* End)
 {
