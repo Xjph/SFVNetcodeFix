@@ -1,15 +1,17 @@
 #include <Windows.h>
 #include <Psapi.h>
+#ifdef DEBUG
 #include <stdio.h>
 #include <fstream>
 #include <time.h>
 #include <direct.h>
+#endif
 
 constexpr int LAG_THRESHOLD = 16;
 constexpr int MAX_PING = 16;
-constexpr int GAME_START_FRAME = 210;
+constexpr int GAME_START_FRAME = 210; // Usually starts around frame 200, but there's some variability so leave a buffer
 constexpr int PACKET_HISTORY_SIZE = 32;
-constexpr int TS_HOLD_TIME = 4;
+constexpr int TS_HOLD_TIME = 4; // Only adjust the desired timestamp for this long before allowing it to recover
 constexpr int RESYNC_WINDOW = 10;
 constexpr int DBGLEN = 1024;
 
@@ -116,6 +118,7 @@ bool GetPing(unsigned int* Ping)
 	return true;
 }
 
+#ifdef DEBUG
 void filename(char* str, int len)
 {
 	time_t now;
@@ -129,6 +132,7 @@ void filename(char* str, int len)
 	_mkdir(dir);
 	strftime(str, len, "c:\\sfv-logs\\current\\log-%F-%H%M%S.txt", &FmtNow);
 }
+#endif
 
 // Called after UInputUnit::UpdateTimestamps
 extern "C" void UpdateTimestampsHook(UInputUnit * Input)
@@ -136,43 +140,49 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	const auto OldTimeBase = Input->TimeBase;
 	UpdateTimestampsOrigWrapper(Input);
 
+#ifdef DEBUG
 	static char DBGStr[DBGLEN];
 	static std::ofstream DBGFile;
-
+#endif
 	// Game sets DesiredTimestamp to be less than CurrentTimestamp at round start,
 	// but converges it to CurrentTimestamp + 1.
 	// Once converged, hold it there during brief mash lag.
 	static bool TimestampAdjustAllowed = false;
 	static int LagRecord[PACKET_HISTORY_SIZE], PingRecord[PACKET_HISTORY_SIZE]; // auto initialized to all zeroes
-	static int ArrayPosition;
+	static int PacketRecordPosition;
 	static int ResyncTimer, ResyncLevel;
 
 	// Game hasn't started yet if TimeBase is still updating
 	if (Input->TimeBase != OldTimeBase)
 	{
+#ifdef DEBUG
 		if (DBGFile.is_open())
 		{
 			DBGFile << "Waiting for TimeBase\n";
 			DBGFile.close();
-			TimestampAdjustAllowed = false;
-			ResyncTimer = 0;
 		}
+#endif
+		TimestampAdjustAllowed = false;
+		ResyncTimer = 0;
 		return;
 	}
 
 	unsigned int Ping;
 	if (!GetPing(&Ping))
 	{
+#ifdef DEBUG
 		if (DBGFile.is_open())
 		{
 			DBGFile << "Failed to get ping\n";
 			DBGFile.close();
-			TimestampAdjustAllowed = false;
-			ResyncTimer = 0;
 		}
+#endif
+		TimestampAdjustAllowed = false;
+		ResyncTimer = 0;
 		return;
 	}
 
+#ifdef DEBUG
 	if (!DBGFile.is_open() && (Input->TimeBase > 150) && (Input->TimeBase < 500))
 	{
 		filename(DBGStr, DBGLEN);
@@ -182,12 +192,15 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		loc = strstr(DBGStr, ".txt");
 		memcpy_s(loc, 64, ".bin", 4);
 	}
+#endif
 
 	auto PingFrames = (unsigned int)((float)Ping * 60.f / 1000.f + .5f);
-	if (PingFrames > MAX_PING) // From time to time, the GetPing function returns nonsense - I have no idea why.  Nothing can be done in this case
+	if (PingFrames > MAX_PING) // In some games, the GetPing function returns nonsense - I have no idea why.  Nothing can be done in this case
 	{
+#ifdef DEBUG
 		snprintf(DBGStr, DBGLEN, "Horked up a giant ping of %d\n", PingFrames);
 		DBGFile << DBGStr;
+#endif
 		return;
 	}
 
@@ -195,11 +208,13 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	if (TimestampAdjustAllowed && ((Input->DesiredTimestamp + 1) < Input->CurrentTimestamp) && (DesiredTimestampCounter < TS_HOLD_TIME))
 	{
 		DesiredTimestampCounter++;
+#ifdef DEBUG
 		if (DBGFile.is_open())
 		{
 			snprintf(DBGStr, DBGLEN, "Adjusting desired timestamp from %d to %d\n", Input->DesiredTimestamp, Input->CurrentTimestamp - 1);
 			DBGFile << DBGStr;
 		}
+#endif
 		Input->DesiredTimestamp = Input->CurrentTimestamp - 1;
 	}
 	else
@@ -208,6 +223,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		TimestampAdjustAllowed = TimestampAdjustAllowed | (Input->DesiredTimestamp > Input->CurrentTimestamp);
 	}
 
+#ifdef DEBUG
 	static int OldRealtimeStamp = 0;
 	auto ct = Input->CurrentTimestamp % 60;
 	if (ct == 0)
@@ -228,6 +244,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 			Ping, PingFrames, Input->TimeBase, Input->CurrentTimestamp, Input->OpponentTimestamp, Input->DesiredTimestamp, Input->MaxFramesAhead, Input->FramesToSimulate);
 	if (DBGFile.is_open())
 		DBGFile << DBGStr;
+#endif
 
 	if (ResyncTimer > 0) // Resync ordered by previous lag detection
 	{
@@ -242,18 +259,20 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 	else if (Input->CurrentTimestamp > GAME_START_FRAME) // Normal monitored frames - record lag stats, then check for lag in effect
 	{
 		int LagNow = Input->CurrentTimestamp - Input->OpponentTimestamp;
-		LagRecord[ArrayPosition] = LagNow;
-		PingRecord[ArrayPosition] = PingFrames;
-		if (ArrayPosition == PACKET_HISTORY_SIZE - 1)
-			ArrayPosition = 0;
+		LagRecord[PacketRecordPosition] = LagNow;
+		PingRecord[PacketRecordPosition] = PingFrames;
+		if (PacketRecordPosition == PACKET_HISTORY_SIZE - 1)
+			PacketRecordPosition = 0;
 		else
-			ArrayPosition++;
+			PacketRecordPosition++;
 
 		if (Input->CurrentTimestamp > GAME_START_FRAME + PACKET_HISTORY_SIZE)
 		{
 			if (LagNow > (int)PingFrames + 1) // Buffers full and lag is ominous
 			{
+#ifdef DEBUG
 				DBGFile << "Performing detailed lagalysis... ";
+#endif
 				int PingHistogram[MAX_PING]; // Frequency of half-ping times with which packets are received
 				memset(PingHistogram, 0, MAX_PING * sizeof(int));
 				for (int i = 0; i < PACKET_HISTORY_SIZE; i++)
@@ -273,8 +292,10 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 						HighPingCount = PingHistogram[i];
 						MostCommonPing = i;
 					}
+#ifdef DEBUG
 				snprintf(DBGStr, DBGLEN, "Ping mode is %d\n", MostCommonPing);
 				DBGFile << DBGStr;
+#endif
 
 				// Finally determine if there have been enough laggy frames recently to activate the lag compensation
 				int LaggyFrames = 0;
@@ -283,8 +304,10 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 						LaggyFrames++;
 				if (LaggyFrames > LAG_THRESHOLD)
 				{
+#ifdef DEBUG
 					snprintf(DBGStr, DBGLEN, "Activating anti-lag, %d laggy frames detected\n", LaggyFrames);
 					DBGFile << DBGStr;
+#endif
 					ResyncLevel = MostCommonPing;
 					Input->MaxFramesAhead = ResyncLevel;
 					ResyncTimer = RESYNC_WINDOW;
