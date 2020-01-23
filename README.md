@@ -10,6 +10,7 @@ I did, testing and recruiting testers.
 * devildaddy_cokedout80s
 * bearp0p
 * cowman715 (Watch his stream at twitch.tv/cowandlady)
+* The Mika discord for support and getting us together
 
 ## Why should I use this? (This is the path... of my destiny!)
 Everyone except Capcom understands the one-sided lag problem of SFV.  It 
