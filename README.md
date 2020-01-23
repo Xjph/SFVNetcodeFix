@@ -11,6 +11,7 @@ I did, testing and recruiting testers.
 * bearp0p
 * cowman715 (Watch his stream at twitch.tv/cowandlady)
 * The Mika discord for support and getting us together
+* Random, unsuspecting people online.  You can take me off your blacklist now kthx.
 
 ## Why should I use this? (This is the path... of my destiny!)
 Everyone except Capcom understands the one-sided lag problem of SFV.  It 
