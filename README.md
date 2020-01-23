@@ -1,7 +1,6 @@
 ## TL;DR Instructions (That's how you start the fight and finish it quickly!)
 Exactly the same as Altimor's original mod.
 Extract the zip to "Steam/steamapps/common/Street Fighter V".
-There is no difference between Altimor's mod and this one.
 
 ## Special thanks to testers: (It's so nice to meet!)
 * Shadowdevo AKA bowlgirlblergh, who probably worked harder on this than
@@ -25,8 +24,8 @@ This incompatbility has caused a lot of problems as many PS4 players turn
 crossplay off, leaving both platforms with a smaller matchmaking pool.
 Meanwhile, PC players are left with the unappealing choice of using the mod,
 lagswitching half their opponents, or not using it, and getting lagswitched
-instead.  The situation is very bad.  What's more, Capcom might change the
-game so that the mod doesn't work any more.
+instead.  The situation is very bad.  What's more, given the problems caused,
+Capcom might change the game so that the mod doesn't work any more.
 
 This version puts compatibility front and center, while maintaining equal or 
 better performance compared to the original.  This should work with modded, 
@@ -44,12 +43,12 @@ it should help.
 
 ## Reduced mashing lag (OK.  Let's rumble!)
 When your opponent mashes, usually on wakeup or dizzy, it's possible to 
-experience some lag.  This should reduce this effect.  Again, mileage may
+experience some lag.  This should reduce this effect.  Your mileage may
 vary.
 
 ## Reduced stage lag (I'll totally make this look cool!)
 The mod should also reduce some of the visual artifacts caused by playing on 
-stages other than training stage.  Your mileage may vary.
+stages other than training stage.  Again, mileage may vary.
 
 ## Don't other stages actually cause lag? (Let my beauty intoxicate you.)
 Not really, they mostly just look bad when the game is desynced.  This is
@@ -68,6 +67,11 @@ do not actually contribute to lag.
 Originally I expected Altimor to make a fixed version, so I didn't even start 
 on it for about a week.  It took about a week after that.  However, most of 
 that time was testing.  I probably spent only a day or so on the actual code.
+
+Unfortunately, reverse engineering is a specialized skill, and I don't specialize
+in it.  It would have been difficult-to-impossible for me to create this mod
+without the work done by Altimor to gain access to the necessary internal game
+state.
 
 ## Who are you and why should I trust you? (I'm not very fond of conflict.)
 Just zis guy, you know?
@@ -90,7 +94,7 @@ unless Capcom adopts these improvements into the stock game.
 About one game in ten, due to some sort of problem with the way the mod gets
 data from the underlying code, it can't tell what the ping is and has to turn
 itself off.  There is nothing I can do about this.  Altimor wrote that part
-of the code and it will be difficult for me to fix it.
+of the code and it will be difficult for me to fix it, although there's hope.
 
 ## Hey!  My game crashes at startup!  (I... blew it.)
 This shouldn't happen, but if it does, go to:
