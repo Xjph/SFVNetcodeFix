@@ -1,5 +1,8 @@
 #include <Windows.h>
 #include <Psapi.h>
+#ifdef _DEBUG
+#define DEBUG
+#endif
 #ifdef DEBUG
 #include <stdio.h>
 #include <fstream>
@@ -266,6 +269,7 @@ extern "C" void UpdateTimestampsHook(UInputUnit * Input)
 		else
 			PacketRecordPosition++;
 
+		// FIXME: Can easily delay this N-K frames, where N is the LAG_THRESHOLD and K is the current lag frame count
 		if (Input->CurrentTimestamp > GAME_START_FRAME + PACKET_HISTORY_SIZE)
 		{
 			if (LagNow > (int)PingFrames + 1) // Buffers full and lag is ominous
