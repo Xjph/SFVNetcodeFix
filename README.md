@@ -2,16 +2,25 @@
 Exactly the same as Altimor's original mod.
 Extract the zip to "Steam/steamapps/common/Street Fighter V".
 
+NOTE: I suffered a concussion in between preparing the mod for release and 
+actually releasing it.  As a result I will probably not be online for the
+first day or two afterward.  I promise I will come back and answer questions
+and/or hate mail by Sunday, Jan. 26.
+
 ## Special thanks to testers: (It's so nice to meet!)
 * Shadowdevo AKA bowlgirlblergh, who probably worked harder on this than
-I did, testing and recruiting testers.
+I did, testing, recruiting testers, and getting the word out.
+* Arlieth
 * @RemoteStealthy
 * NoxidLyrrad
+* LilEvil
 * devildaddy_cokedout80s
 * bearp0p
 * cowman715 (Watch his stream at twitch.tv/cowman715)
 * The Mika discord for support and getting us together
 * Random, unsuspecting people online.  You can take me off your blacklist now kthx.
+
+And of course Altimor, whose mod enabled the development of this one.
 
 ## Why should I use this? (This is the path... of my destiny!)
 Everyone except Capcom understands the one-sided lag problem of SFV.  It 
@@ -23,7 +32,7 @@ the match, lag switches, etc.
 Compared to Altimor's mod, this version offers fewer slowdowns, better compatibility
 with WiFi and other unstable connections, and of course, crossplay.
 
-## Crossplay compatibility (Return to harmony.)
+## Crossplay compatibility (Harmony.  That is the truth of what you must seek.)
 Altimor's mod, while well-intentioned, wasn't compatible with PS4 or unmodded PC.
 This incompatibility has caused a lot of problems as many PS4 players turn
 crossplay off, leaving both platforms with a smaller matchmaking pool.
@@ -39,16 +48,19 @@ much benefit from the mod but, critically, won't get worse either.  Hopefully,
 this will deter Capcom from doing anything rash, and hopefully they'll adopt
 the mod themselves!
 
+The initial release does not work well with Altimor's version of the mod.  If
+this proves to be a problem after a few days I have ideas for improving it, but
+I don't guarantee it will be possible.
+
 ## Faster performance (Come on! Let's turn up the heat!)
 Altimor's mod works well when the connection is quality, but it can feel laggy
 or "underwater" when on a choppy connection.  This version should run more
 smoothly under a wider variety of conditions.  You can only do so much about
-that random WiFi player from 5000 miles away.  Don't expect a miracle.  But
-it should help.
+that random WiFi player from 5000 miles away.  But it should help.
 
 ## Reduced mashing lag (OK.  Let's rumble!)
 When your opponent mashes, usually on wakeup or dizzy, it's possible to 
-experience some lag.  This should reduce this effect.  Your mileage may
+experience some lag.  This mod may reduce this effect.  Your mileage may
 vary.
 
 ## Reduced stage lag (I'll totally make this look cool!)
@@ -57,16 +69,17 @@ stages other than training stage.  Again, mileage may vary.
 
 ## Don't other stages actually cause lag? (Let my beauty intoxicate you.)
 Not really, they mostly just look bad when the game is desynced.  This is
-a complicated topic.  MDZ_Jimmy produced a video a while back claiming 
-that there were no frame drops when running stages, but I think his 
-methodology was flawed.  Frame drops (measured with frame counters, so
-no subjectivity or error possible) are visible when running stages on 
-low-spec PCs, even if those low-spec PCs equal or exceed the performance of
-the PS4.  So I am pretty sure frame drops are real.
+a complicated topic.  There is some debate about whether stages actually
+even cause frame drops; MDZ_Jimmy has provided some evidence that they
+don't, but I have seen them with frame counters on low spec PCs.  I think
+his methodology wasn't perfect and frame drops are still real.
 
 However, even if the game drops frames, it generally does so by skipping
 frames, rather than slowing down.  As a result, stage-induced frame drops
 do not actually contribute to lag.
+
+TL;DR please feel free to use stages other than training stage, especially
+if you use the mod, but even if you don't.
 
 ## How hard was this to make? (I'll finish this in no time!)
 Originally I expected Altimor to make a fixed version, so I didn't even start 
@@ -92,8 +105,11 @@ for personal use), open the netcode_fix.sln file, and build a release build.
 
 ## What's coming next? (Have you considered your destiny? Do you believe in fate?)
 Future versions may make it possible to improve the connection for both sides,
-even if only one has the mod.  Of course, nothing can be done for PS4 vs. PS4,
-unless Capcom adopts these improvements into the stock game.
+even if only one has the mod.  And compatibility with Altimor's version may
+be on the table if not enough people switch to this version.
+
+Of course, nothing can be done for PS4 vs. PS4, unless Capcom adopts these
+improvements into the stock game.  Which they should!
 
 ## Known Issues (So... where do you want me to break you first?)
 About one game in ten, due to some sort of problem with the way the mod gets
