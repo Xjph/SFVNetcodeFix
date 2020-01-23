@@ -9,7 +9,7 @@ I did, testing and recruiting testers.
 * NoxidLyrrad
 * devildaddy_cokedout80s
 * bearp0p
-* cowman715 (Watch his stream at twitch.tv/cowandlady)
+* cowman715 (Watch his stream at twitch.tv/cowman715)
 * The Mika discord for support and getting us together
 * Random, unsuspecting people online.  You can take me off your blacklist now kthx.
 
