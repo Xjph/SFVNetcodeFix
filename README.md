@@ -59,6 +59,7 @@ methodology was flawed.  Frame drops (measured with frame counters, so
 no subjectivity or error possible) are visible when running stages on 
 low-spec PCs, even if those low-spec PCs equal or exceed the performance of
 the PS4.  So I am pretty sure frame drops are real.
+
 However, even if the game drops frames, it generally does so by skipping
 frames, rather than slowing down.  As a result, stage-induced frame drops
 do not actually contribute to lag.
@@ -70,9 +71,12 @@ that time was testing.  I probably spent only a day or so on the actual code.
 
 ## Who are you and why should I trust you? (I'm not very fond of conflict.)
 Just zis guy, you know?
+
 I'm active in the Mika, Kolin, and Menat discords, and I'm a regular in the
 nuggybunny and commanderjesse streams on twitch.
+
 I'm the worst Street Fighter player, but I'm not a bad programmer.
+
 The source code is published and if you really don't trust me you can build
 it from source yourself.  Simply get a copy of Visual Studio 2019 (it's free
 for personal use), open the netcode_fix.sln file, and build a release build.
