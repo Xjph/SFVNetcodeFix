@@ -19,11 +19,14 @@ to crash the game, just enough to create lag for everyone.  This mod
 reduces this problem.  It also will correct for network fluctuations during
 the match, lag switches, etc.
 
+Compared to Altimor's mod, this version offers fewer slowdowns, better compatibility
+with WiFi and other unstable connections, and of course, crossplay.
+
 ## Crossplay compatibility (Return to harmony.)
-Altimor's mod, while well-intended, wasn't compatible with PS4 or unmodded PC.
-This incompatbility has caused a lot of problems as many PS4 players turn
+Altimor's mod, while well-intentioned, wasn't compatible with PS4 or unmodded PC.
+This incompatibility has caused a lot of problems as many PS4 players turn
 crossplay off, leaving both platforms with a smaller matchmaking pool.
-Meanwhile, PC players are left with the unappealing choice of using the mod,
+Meanwhile, PC players are left with the unappealing choice of using the mod and
 lagswitching half their opponents, or not using it, and getting lagswitched
 instead.  The situation is very bad.  What's more, given the problems caused,
 Capcom might change the game so that the mod doesn't work any more.
